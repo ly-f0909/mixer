@@ -1,50 +1,75 @@
 import * as Tone from 'tone';
+import React from 'react';
 import './PianoComponent.css';
 
-declare global {
-  interface Window {
-    handlePianoNotePressed?: (note: number) => void;
-  }
-}
+const PianoComponent: React.FC = () => {
+  const handleClick = (note: number) => {
+    const adsrParams = {
+      attack: 0.1, // 可根据UI动态调整
+      decay: 0.2,
+      sustain: 0.7,
+      release: 0.3,
+      midi_note: note
+    };
 
-export default function PianoComponent() {
-  const handleClick = async (note: number) => {
-    // 启动音频上下文
-    await Tone.start();
-
-    // 创建一个合成器并连接到目的地（扬声器）
-    const synth = new Tone.Synth().toDestination();
-
-    // 将MIDI音符转换为音符名称（例如 C4, D#4 等）
-    const noteName = Tone.Frequency(note, "midi").toNote();
-
-    // 播放音符，时长为8分音符
-    synth.triggerAttackRelease(noteName, "8n");
-
-    // 如果全局对象 window 上存在 handlePianoNotePressed 函数，则调用它
-    if (typeof window.handlePianoNotePressed === 'function') {
-      window.handlePianoNotePressed(note);
-    }
+    // 发送音符和ADSR参数到后端生成音频
+    fetch('/generate_audio', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(adsrParams),
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.status === "success") {
+        // 创建音频对象并播放
+        const audio = new Audio(data.url);
+        audio.play();
+      } else {
+        console.error('Failed to generate audio:', data.message);
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+    });
   };
+
+  const whiteKeyNotes = [0, 2, 4, 5, 7, 9, 11]; // 白键MIDI note的相对位置
+  const blackKeyNotes = [1, 3, null, 6, 8, 10, null]; // 黑键MIDI note的相对位置
 
   return (
     <div id="piano">
-      {/* 创建12个钢琴键，假设每个键代表一个MIDI音符 */}
-      {[...Array(12)].map((_, index) => {
-        const note = 60 + index;  // 从 MIDI 音符 60 (C4) 开始
-        const isWhiteKey = index % 2 === 0;  // 偶数索引为白键，奇数为黑键
-
+      {whiteKeyNotes.map((offset, index) => {
+        const note = 60 + offset;
         return (
           <div
-            key={index}
-            className={`key ${isWhiteKey ? 'white' : 'black'}`}
+            key={`white-${index}`}
+            className="key white"
             onClick={() => handleClick(note)}
           >
-            {/* 可以在每个键上显示音符名称，供调试或显示用途 */}
-            {/* <span>{Tone.Frequency(note, "midi").toNote()}</span> */}
+            <span>{Tone.Frequency(note, 'midi').toNote()}</span>
           </div>
         );
       })}
+      {blackKeyNotes.map((offset, index) => {
+        if (offset !== null) {
+          const note = 60 + offset;
+          return (
+            <div
+              key={`black-${index}`}
+              className="key black"
+              onClick={() => handleClick(note)}
+            >
+              <span>{Tone.Frequency(note, 'midi').toNote()}</span>
+            </div>
+          );
+        } else {
+          return <div key={`spacer-${index}`} className="spacer" style={{ width: '50px' }} />;
+        }
+      })}
     </div>
   );
-}
+};
+
+export default PianoComponent;

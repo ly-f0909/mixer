@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, send_from_directory
 import asyncio
 import websockets
 import json
@@ -10,6 +10,7 @@ from torchsynth.synth import Voice, Noise, AudioMixer, MonophonicKeyboard, SineV
 import torchaudio
 import IPython.display as ipd
 import matplotlib.pyplot as plt
+import io
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 app = Flask(__name__)
@@ -64,21 +65,30 @@ def update_adsr():
 #设置键盘模块的音符持续时间为 1.0 秒
 #设置第一个电压控制振荡器（VCO）模块的调谐为 0.0。调谐是一个介于 -1 到 1 的值，表示音高的偏移。
 #设置第一个 VCO 模块的调制深度为 12.0。调制深度是一个介于 0 到 1 的值，表示调制信号的强度。
+
+AUDIO_FOLDER = "/Users/linyafeng/Desktop"
+FILE_NAME="output.wav"
 @app.route('/generate_audio', methods=['POST'])
 def generate_audio():
     try:
-        # 更新LFO参数
-        voice1.lfo_1.set_parameter("frequency", torch.tensor([5.0]))
+        request_data = request.json
+        midi_note = request_data.get("midi_note", 69)
+
+        # 更新ADSR参数
+        voice1.adsr_1.set_parameter("attack", torch.tensor([request_data.get("attack", 0.1)]))
+        voice1.adsr_1.set_parameter("decay", torch.tensor([request_data.get("decay", 0.2)]))
+        voice1.adsr_1.set_parameter("sustain", torch.tensor([request_data.get("sustain", 0.7)]))
+        voice1.adsr_1.set_parameter("release", torch.tensor([request_data.get("release", 0.3)]))
 
         # 设置合成器参数
         voice1.set_parameters(
             {
-                ("keyboard", "midi_f0"): tensor([69.0,50.0]),
-                ("keyboard", "duration"): tensor([1.0]),
-                ("vco_1", "tuning"): tensor([0.0,0.0]),
-                ("vco_1", "mod_depth"): tensor([-12.0,12.0]),
-                ("filter_1", "cutoff_frequency"): tensor([2000.0]),
-                ("filter_1", "resonance"): tensor([0.5]),
+                ("keyboard", "midi_f0"): torch.tensor([midi_note]),
+                ("keyboard", "duration"): torch.tensor([1.0]),
+                ("vco_1", "tuning"): torch.tensor([0.0]),
+                ("vco_1", "mod_depth"): torch.tensor([12.0]),
+                ("filter_1", "cutoff_frequency"): torch.tensor([2000.0]),
+                ("filter_1", "resonance"): torch.tensor([0.5]),
             }
         )
 
@@ -90,27 +100,30 @@ def generate_audio():
         noise_out = noise()
         audio_out, parameters, is_train = voice1()
         audio_tensor = audio_out.detach().cpu()
+
         if audio_tensor.ndim == 3:
             audio_tensor = audio_tensor.squeeze(0)
-        # 生成噪声信号
-        noise_out = noise()
-        noise_tensor = noise_out[0].detach().cpu()
-        # 使用AudioMixer混合音频和噪声信号
-        mixed_audio = audio_mixer(audio_tensor.unsqueeze(0), noise_tensor.unsqueeze(0))
-        mixed_audio_tensor = mixed_audio[0].detach().cpu()
-        # Mixer params are set in dB
-        audio_mixer.set_parameter("level0", tensor([0.24,0.25], device=device))
-        audio_mixer.set_parameter("level1", tensor([0.25,0.25], device=device))
-        audio_mixer.set_parameter("level2", tensor([0.125,0.125], device=device))
-        out = audio_mixer(sine_out, sqr_out, noise_out)
-        mixed_audio_tensor = out[0].detach().cpu()
-        # 保存音频为 WAV 文件
-        torchaudio.save("/path/to/output.wav", audio_tensor, 44100)
-        torchaudio.save("/path/to/noise.wav", noise_tensor.unsqueeze(0), 44100)
-        # 返回结果
-        return jsonify({"status": "success", "message": "Audio and noise generated and saved."}), 200
+
+        torchaudio.save(f"/Users/linyafeng/Desktop/{FILE_NAME}", audio_tensor, 44100)
+        return jsonify({"status": "success", "url": f"/audio/{FILE_NAME}"}), 200
+
+        # # 将音频数据转换为字节流
+        # buffer = io.BytesIO()
+        # torchaudio.save(buffer, audio_tensor.unsqueeze(0), 44100, format="wav")
+        # buffer.seek(0)
+        #
+        # # 返回音频数据流作为响应
+        # return Response(buffer, mimetype="audio/wav")
+
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route(f'/audio/{FILE_NAME}')
+def serve_audio(filename):
+    return send_from_directory(AUDIO_FOLDER, filename)
+
+if __name__ == '__main__':
+    app.run('0.0.0.0', 5000)
 
 def stft_plot(signal):
     # Plot the STFT of the signal
