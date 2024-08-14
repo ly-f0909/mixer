@@ -13,19 +13,39 @@ const PianoComponent: React.FC = () => {
     };
 
     // 发送音符和ADSR参数到后端生成音频
-    fetch('/generate_audio', {
+    fetch('http://localhost:5000/generate_audio', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(adsrParams),
     })
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
     .then(data => {
       if (data.status === "success") {
         // 创建音频对象并播放
-        const audio = new Audio(data.url);
-        audio.play();
+        const audio = new Audio('http://localhost:5000/'+data.url);
+        // 错误处理
+        audio.onerror = (e) => {
+    console.error("Error loading audio file:", e);
+    console.error("Error details: ", {
+        url: data.url,  // URL 尝试加载的音频文件
+        audio: audio,  // audio 元素对象
+        error: e,  // 错误事件
+    });
+};
+
+        // 当音频可以播放时播放
+        audio.oncanplaythrough = () => {
+          audio.play().catch((error) => {
+            console.error("Failed to play audio:", error);
+          });
+        };
       } else {
         console.error('Failed to generate audio:', data.message);
       }
