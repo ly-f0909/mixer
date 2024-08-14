@@ -7,6 +7,7 @@ import { DataflowEngine, DataflowNode } from 'rete-engine';
 import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
 import { ContextMenuPlugin, ContextMenuExtra, Presets as ContextMenuPresets } from 'rete-context-menu-plugin';
 
+
 const adsrSocket = new Classic.Socket('adsrSocket');
 
 type Node = AttackNode | DecayNode | SustainNode | ReleaseNode | ADSRNode | VoiceNode | VOCNode | MonophonicKeyboardNode;
@@ -178,8 +179,31 @@ class MonophonicKeyboardNode extends Classic.Node implements DataflowNode {
   }
 }
 
-type AreaExtra = Area2D<Schemes> | ReactArea2D<Schemes> | ContextMenuExtra;
+// default.ts (在 'rete' 文件夹中)
 
+export function handlePianoNotePressed(note: number) {
+    console.log('Note received in TypeScript:', note);
+
+    fetch('/play_note', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ note })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Note played successfully:', data);
+    })
+    .catch(error => {
+        console.error('Error playing note:', error);
+    });
+}
+
+(window as any).handlePianoNotePressed = handlePianoNotePressed;
+
+
+type AreaExtra = Area2D<Schemes> | ReactArea2D<Schemes> | ContextMenuExtra;
 
 export async function createEditor(container: HTMLElement) {
   console.log('createEditor called with container:', container);
