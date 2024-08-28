@@ -7,7 +7,6 @@ import { DataflowEngine, DataflowNode } from 'rete-engine';
 import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
 import { ContextMenuPlugin, ContextMenuExtra, Presets as ContextMenuPresets } from 'rete-context-menu-plugin';
 
-
 const adsrSocket = new Classic.Socket('adsrSocket');
 
 type Node = AttackNode | DecayNode | SustainNode | ReleaseNode | ADSRNode | VoiceNode | VOCNode | MonophonicKeyboardNode;
@@ -89,6 +88,8 @@ class ADSRNode extends Classic.Node implements DataflowNode {
     };
 
     console.log('ADSR data:', adsrData);
+
+    // 实时发送到后端
     fetch('http://localhost:5000/update_adsr', {
       method: 'POST',
       headers: {
@@ -182,26 +183,27 @@ class MonophonicKeyboardNode extends Classic.Node implements DataflowNode {
 // default.ts (在 'rete' 文件夹中)
 
 export function handlePianoNotePressed(note: number) {
-    console.log('Note received in TypeScript:', note);
+  console.log('Note received in TypeScript:', note);
 
-    fetch('/play_note', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ note })
-    })
+  fetch('/play_note', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ note })
+  })
     .then(response => response.json())
     .then(data => {
-        console.log('Note played successfully:', data);
+      console.log('Note played successfully:', data);
     })
     .catch(error => {
-        console.error('Error playing note:', error);
+      console.error('Error playing note:', error);
     });
 }
 
-(window as any).handlePianoNotePressed = handlePianoNotePressed;
-
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error
+(window as unknown).handlePianoNotePressed = handlePianoNotePressed;
 
 type AreaExtra = Area2D<Schemes> | ReactArea2D<Schemes> | ContextMenuExtra;
 
@@ -237,31 +239,31 @@ export async function createEditor(container: HTMLElement) {
   const dataflow = new DataflowEngine<Schemes>();
   editor.use(dataflow);
 
-  const attack = new AttackNode(0.1, process);
-  const decay = new DecayNode(0.2, process);
-  const sustain = new SustainNode(0.7, process);
-  const release = new ReleaseNode(0.3, process);
-  const adsr = new ADSRNode();
-  const voice = new VoiceNode();
-  const voc = new VOCNode();
-  const keyboard = new MonophonicKeyboardNode();
+  let attackNode = new AttackNode(0.1, process);
+  let decayNode = new DecayNode(0.2, process);
+  let sustainNode = new SustainNode(0.7, process);
+  let releaseNode = new ReleaseNode(0.3, process);
+  const adsrNode = new ADSRNode();
+  const voiceNode = new VoiceNode();
+  const vocNode = new VOCNode();
+  const keyboardNode = new MonophonicKeyboardNode();
 
-  await editor.addNode(attack);
-  await editor.addNode(decay);
-  await editor.addNode(sustain);
-  await editor.addNode(release);
-  await editor.addNode(adsr);
-  await editor.addNode(voice);
-  await editor.addNode(voc);
-  await editor.addNode(keyboard);
+  await editor.addNode(attackNode);
+  await editor.addNode(decayNode);
+  await editor.addNode(sustainNode);
+  await editor.addNode(releaseNode);
+  await editor.addNode(adsrNode);
+  await editor.addNode(voiceNode);
+  await editor.addNode(vocNode);
+  await editor.addNode(keyboardNode);
 
-  await editor.addConnection(new Connection(attack, 'value', adsr, 'attack'));
-  await editor.addConnection(new Connection(decay, 'value', adsr, 'decay'));
-  await editor.addConnection(new Connection(sustain, 'value', adsr, 'sustain'));
-  await editor.addConnection(new Connection(release, 'value', adsr, 'release'));
-  await editor.addConnection(new Connection(adsr, 'signal', voice, 'signal'));
-  await editor.addConnection(new Connection(voc, 'signal', voice, 'voc'));
-  await editor.addConnection(new Connection(keyboard, 'note_on_duration', adsr, 'alpha'));
+  await editor.addConnection(new Connection(attackNode, 'value', adsrNode, 'attack'));
+  await editor.addConnection(new Connection(decayNode, 'value', adsrNode, 'decay'));
+  await editor.addConnection(new Connection(sustainNode, 'value', adsrNode, 'sustain'));
+  await editor.addConnection(new Connection(releaseNode, 'value', adsrNode, 'release'));
+  await editor.addConnection(new Connection(adsrNode, 'signal', voiceNode, 'signal'));
+  await editor.addConnection(new Connection(vocNode, 'signal', voiceNode, 'voc'));
+  await editor.addConnection(new Connection(keyboardNode, 'note_on_duration', adsrNode, 'alpha'));
 
   const arrange = new AutoArrangePlugin<Schemes>();
   arrange.addPreset(ArrangePresets.classic.setup());
@@ -275,26 +277,57 @@ export async function createEditor(container: HTMLElement) {
   const accumulating = AreaExtensions.accumulateOnCtrl();
   AreaExtensions.selectableNodes(area, selector, { accumulating });
 
-  async function process() {
-    dataflow.reset();
-    editor
-      .getNodes()
-      .filter((node) => node instanceof VoiceNode)
-      .forEach(async (node) => {
-        const data = await dataflow.fetch(node.id);
-        console.log(node.id, 'produces', data);
-      });
+  async function sendToBackend(adsrData: { attack: number; decay: number; sustain: number; release: number; alpha: number }) {
+  try {
+    console.log('Sending data to backend:', adsrData); // 调试信息
+    const response = await fetch('http://localhost:5000/update_adsr', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(adsrData)
+    });
+
+    const data = await response.json();
+    console.log('Backend response:', data);
+  } catch (error) {
+    console.error('Error sending data to backend:', error);
   }
+}
+async function process() {
+  // 从各个节点获取数据
+  const attackValue = attackNode.data().value ?? 0;
+  const decayValue = decayNode.data().value ?? 0;
+  const sustainValue = sustainNode.data().value ?? 0;
+  const releaseValue = releaseNode.data().value ?? 0;
+  const alphaValue = keyboardNode.data().note_on_duration ?? 0;
 
-  editor.addPipe((context) => {
-    if (context.type === 'connectioncreated' || context.type === 'connectionremoved') {
-      process();
-    }
-    return context;
-  });
+  // 将收集到的数据发送到后端
+  const adsrData = {
+    attack: attackValue,
+    decay: decayValue,
+    sustain: sustainValue,
+    release: releaseValue,
+    alpha: alphaValue
+  };
 
-  process();
+  await sendToBackend(adsrData);
+}
 
+  attackNode = new AttackNode(0.1, () => process());
+  decayNode = new DecayNode(0.2, () => process());
+  sustainNode = new SustainNode(0.7, () => process());
+  releaseNode = new ReleaseNode(0.3, () => process());
+
+// 每次输入变化时触发 `process()` 函数，确保数据实时发送
+editor.addPipe((context) => {
+  if (context.type === 'connectioncreated' || context.type === 'connectionremoved') {
+    process();
+  }
+  return context;
+});
+
+process();
   return {
     destroy: () => area.destroy(),
   };
