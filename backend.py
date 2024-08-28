@@ -7,6 +7,9 @@ import torch
 from torchsynth.synth import Voice, Noise, AudioMixer, MonophonicKeyboard, SineVCO, SquareSawVCO
 import torchaudio
 import io
+from torchsynth.module import LFO, ModulationMixer
+from torchsynth.module import ADSR
+
 
 app = Flask(__name__)
 CORS(app)  # 启用CORS
@@ -15,27 +18,16 @@ CORS(app)  # 启用CORS
 AUDIO_FOLDER = "/Users/linyafeng/Desktop"
 FILE_NAME_TEMPLATE = "output_{}.wav"
 
-# SynthConfig设置
+# SynthConfig设置,生成声音的配置
+#generate 1 sound at once, 4 seconds each
 synthconfig1 = torchsynth.config.SynthConfig(
     batch_size=1, reproducible=False, sample_rate=44100, buffer_size_seconds=4.0
 )
 device = "cuda" if torch.cuda.is_available() else "cpu"
 voice1 = Voice(synthconfig=synthconfig1).to(device)
 keyboard = MonophonicKeyboard(synthconfig=synthconfig1, device=device)
-sine = SineVCO(
-    tuning=torch.tensor([0.0] * synthconfig1.batch_size),
-    synthconfig=synthconfig1,
-).to(device)
-square_saw = SquareSawVCO(
-    tuning=torch.tensor([0.0] * synthconfig1.batch_size),
-    mod_depth=torch.tensor([0.0] * synthconfig1.batch_size),
-    shape=torch.tensor([1.0] * synthconfig1.batch_size),
-    synthconfig=synthconfig1,
-    device=device,
-)
-noise = Noise(synthconfig=synthconfig1, seed=42, device=device)
-audio_mixer = AudioMixer(synthconfig=synthconfig1, n_input=3, curves=[1.0, 1.0, 0.25]).to(device)
 
+#ADSR parameters
 @app.route('/update_adsr', methods=['POST'])
 def update_adsr():
     request_data = request.json
@@ -48,6 +40,41 @@ def update_adsr():
     voice1.adsr_1.set_parameter("sustain", torch.tensor([request_data.get("sustain", 0.7)]))
     voice1.adsr_1.set_parameter("release", torch.tensor([request_data.get("release", 0.3)]))
     return jsonify({"status": "success", "message": "ADSR parameters updated"}), 200
+
+square_saw = SquareSawVCO(
+    tuning=torch.tensor([0.0] * synthconfig1.batch_size),
+    mod_depth=torch.tensor([0.0] * synthconfig1.batch_size),
+    shape=torch.tensor([1.0] * synthconfig1.batch_size),
+    synthconfig=synthconfig1,
+    device=device,
+)
+sine = SineVCO(
+    tuning=torch.tensor([0.0] * synthconfig1.batch_size),
+    synthconfig=synthconfig1,
+).to(device)
+
+noise = Noise(synthconfig=synthconfig1, seed=42, device=device)
+audio_mixer = AudioMixer(synthconfig=synthconfig1, n_input=3, curves=[1.0, 1.0, 0.25]).to(device)
+
+
+
+lfo=LFO(synthconfig=synthconfig1, device=device)
+lfo.set_parameter("mod_depth", torch.tensor(10.0,[0.0] * synthconfig1.batch_size))
+lfo.set_parameter("frequency", torch.tensor([1.0,0.0] * synthconfig1.batch_size))
+out=lfo()
+midi_f0,duration=keyboard
+adsr=ADSR(synthconfig1, device=device)
+envelope = adsr(duration)
+
+lfo2 = LFO(synthconfig1, device=device)
+out2 = lfo2(envelope)
+
+# A modulation mixer can be used to mix a modulation sources together
+# and maintain a 0 to 1 amplitude range
+mixer = ModulationMixer(synthconfig=synthconfig1, device=device, n_input=2, n_output=1)
+mods_mixed = mixer(out, out2)
+
+print(f"Mixed: LFO 1:{mixer.p('0->0')[0]:.2}, LFO 2: {mixer.p('1->0')[0]:.2}")
 
 @app.route('/generate_audio', methods=['POST'])
 def generate_audio():
