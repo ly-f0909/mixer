@@ -9,7 +9,7 @@ import { ContextMenuPlugin, ContextMenuExtra, Presets as ContextMenuPresets } fr
 
 const adsrSocket = new Classic.Socket('adsrSocket');
 
-type Node = AttackNode | DecayNode | SustainNode | ReleaseNode | ADSRNode | VoiceNode | VOCNode | MonophonicKeyboardNode;
+type Node = AttackNode | DecayNode | SustainNode | ReleaseNode | ADSRNode | VoiceNode | VOCNode | MonophonicKeyboardNode | LFONode | VCANode;
 type Conn =
   | Connection<AttackNode, ADSRNode>
   | Connection<DecayNode, ADSRNode>
@@ -17,6 +17,8 @@ type Conn =
   | Connection<ReleaseNode, ADSRNode>
   | Connection<ADSRNode, VoiceNode>
   | Connection<VOCNode, VoiceNode>
+  | Connection<LFONode, VoiceNode>
+  | Connection<VCANode, VoiceNode>
   | Connection<MonophonicKeyboardNode, ADSRNode>;
 type Schemes = GetSchemes<Node, Conn>;
 
@@ -180,7 +182,51 @@ class MonophonicKeyboardNode extends Classic.Node implements DataflowNode {
   }
 }
 
-// default.ts (在 'rete' 文件夹中)
+class VCANode extends Classic.Node implements DataflowNode {
+  width = 180;
+  height = 150;
+
+  constructor() {
+    super('VCA');
+    this.addInput('cv', new Classic.Input(adsrSocket, 'CV Input')); // 控制电压输入
+    this.addOutput('amplified_signal', new Classic.Output(adsrSocket, 'Amplified Signal'));
+    this.addControl('gain', new Classic.InputControl('number', { initial: 1 })); // 增益
+  }
+
+  data(inputs: { cv?: number[] }) {
+    const cv = inputs.cv?.[0] || 0;
+    const gain = (this.controls['gain'] as Classic.InputControl<'number'>).value ?? 1;
+
+    return {
+      amplified_signal: cv * gain, // 放大后的信号
+      gain
+    };
+  }
+}
+
+// LFONode 类
+class LFONode extends Classic.Node implements DataflowNode {
+  width = 200;
+  height = 180;
+
+  constructor() {
+    super('LFO');
+    this.addOutput('modulation_signal', new Classic.Output(adsrSocket, 'Modulation Signal'));
+    this.addControl('frequency', new Classic.InputControl('number', { initial: 5 })); // 频率
+    this.addControl('amplitude', new Classic.InputControl('number', { initial: 1 })); // 振幅
+  }
+
+  data() {
+    const frequency = (this.controls['frequency'] as Classic.InputControl<'number'>).value;
+    const amplitude = (this.controls['amplitude'] as Classic.InputControl<'number'>).value;
+
+    return {
+      modulation_signal: {}, // 输出调制信号
+      frequency,
+      amplitude
+    };
+  }
+}
 
 export function handlePianoNotePressed(note: number) {
   console.log('Note received in TypeScript:', note);
@@ -223,6 +269,8 @@ export async function createEditor(container: HTMLElement) {
       ['ADSR', () => new ADSRNode()],
       ['Voice', () => new VoiceNode()],
       ['VOC', () => new VOCNode()],
+      ['LFO', () => new LFONode()],
+      ['VCA', () => new VCANode()],
       ['MonophonicKeyboard', () => new MonophonicKeyboardNode()]
     ]),
   });
@@ -246,6 +294,8 @@ export async function createEditor(container: HTMLElement) {
   const adsrNode = new ADSRNode();
   const voiceNode = new VoiceNode();
   const vocNode = new VOCNode();
+  const vcaNode = new VCANode();
+  const lfoNode = new LFONode();
   const keyboardNode = new MonophonicKeyboardNode();
 
   await editor.addNode(attackNode);
@@ -255,14 +305,18 @@ export async function createEditor(container: HTMLElement) {
   await editor.addNode(adsrNode);
   await editor.addNode(voiceNode);
   await editor.addNode(vocNode);
+  await editor.addNode(vcaNode);
+  await editor.addNode(lfoNode);
   await editor.addNode(keyboardNode);
 
   await editor.addConnection(new Connection(attackNode, 'value', adsrNode, 'attack'));
   await editor.addConnection(new Connection(decayNode, 'value', adsrNode, 'decay'));
   await editor.addConnection(new Connection(sustainNode, 'value', adsrNode, 'sustain'));
   await editor.addConnection(new Connection(releaseNode, 'value', adsrNode, 'release'));
-  await editor.addConnection(new Connection(adsrNode, 'signal', voiceNode, 'signal'));
-  await editor.addConnection(new Connection(vocNode, 'signal', voiceNode, 'voc'));
+  await editor.addConnection(new Connection(adsrNode, 'signal', voiceNode, 'ADSR'));
+  await editor.addConnection(new Connection(vocNode, 'signal', voiceNode, 'VOC'));
+  await editor.addConnection(new Connection(vcaNode, 'signal', voiceNode, 'VCA'));
+  await editor.addConnection(new Connection(lfoNode, 'signal', voiceNode, 'LFO'));
   await editor.addConnection(new Connection(keyboardNode, 'note_on_duration', adsrNode, 'alpha'));
 
   const arrange = new AutoArrangePlugin<Schemes>();
@@ -277,6 +331,8 @@ export async function createEditor(container: HTMLElement) {
   const accumulating = AreaExtensions.accumulateOnCtrl();
   AreaExtensions.selectableNodes(area, selector, { accumulating });
 
+  //--------------------------------------------------------
+  //communication with backend
   async function sendToBackend(adsrData: { attack: number; decay: number; sustain: number; release: number; alpha: number }) {
   try {
     console.log('Sending data to backend:', adsrData); // 调试信息
