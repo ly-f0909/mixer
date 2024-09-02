@@ -8,21 +8,23 @@ import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-
 import { ContextMenuPlugin, ContextMenuExtra, Presets as ContextMenuPresets } from 'rete-context-menu-plugin';
 
 const adsrSocket = new Classic.Socket('adsrSocket');
-
-type Node = AttackNode | DecayNode | SustainNode | ReleaseNode | ADSRNode | VoiceNode | VOCNode | MonophonicKeyboardNode | LFONode | VCANode;
+const noiseSocket= new Classic.Socket('noiseSocket');
+const vcaSocket = new Classic.Socket('vcaSocket');
+// node and connection
+type Node = AttackNode | DecayNode | SustainNode | ReleaseNode | ADSRNode | MixerNode | VCONode | MonophonicKeyboardNode | NoiseNode | VCANode;
+class Connection<A extends Node, B extends Node> extends Classic.Connection<A, B> {}
 type Conn =
+  | Connection<MonophonicKeyboardNode, ADSRNode>
   | Connection<AttackNode, ADSRNode>
   | Connection<DecayNode, ADSRNode>
   | Connection<SustainNode, ADSRNode>
   | Connection<ReleaseNode, ADSRNode>
-  | Connection<ADSRNode, VoiceNode>
-  | Connection<VOCNode, VoiceNode>
-  | Connection<LFONode, VoiceNode>
-  | Connection<VCANode, VoiceNode>
-  | Connection<MonophonicKeyboardNode, ADSRNode>;
+  | Connection<ADSRNode, VCONode>
+  | Connection<NoiseNode, VCONode>
+  | Connection<VCANode, VCONode>
+  | Connection<VCONode, MixerNode>;
 type Schemes = GetSchemes<Node, Conn>;
 
-class Connection<A extends Node, B extends Node> extends Classic.Connection<A, B> {}
 
 class ADSRComponentNode extends Classic.Node implements DataflowNode {
   width = 180;
@@ -74,7 +76,7 @@ class ADSRNode extends Classic.Node implements DataflowNode {
     this.addInput('decay', new Classic.Input(adsrSocket, 'Decay'));
     this.addInput('sustain', new Classic.Input(adsrSocket, 'Sustain'));
     this.addInput('release', new Classic.Input(adsrSocket, 'Release'));
-    this.addInput('alpha', new Classic.Input(adsrSocket, 'Alpha'));
+    this.addInput('input', new Classic.Input(adsrSocket, 'input'));
     this.addOutput('signal', new Classic.Output(adsrSocket, 'Signal'));
   }
 
@@ -111,14 +113,13 @@ class ADSRNode extends Classic.Node implements DataflowNode {
   }
 }
 
-class VoiceNode extends Classic.Node implements DataflowNode {
+class MixerNode extends Classic.Node implements DataflowNode {
   width = 180;
-  height = 195;
+  height = 140;
 
   constructor() {
-    super('Voice');
+    super('Mixer');
     this.addInput('signal', new Classic.Input(adsrSocket, 'Signal'));
-    this.addInput('voc', new Classic.Input(adsrSocket, 'VOC'));
   }
 
   data(inputs: { signal?: never[]; voc?: never[] }) {
@@ -135,16 +136,21 @@ class VoiceNode extends Classic.Node implements DataflowNode {
   }
 }
 
-class VOCNode extends Classic.Node implements DataflowNode {
+class VCONode extends Classic.Node implements DataflowNode {
   width = 200;
   height = 250;
 
   constructor() {
-    super('VOC');
+    super('VCO');
+    // this.addOutput('signal', new Classic.Output(adsrSocket, 'Signal'));
+    // this.addControl('tuning', new Classic.InputControl('number', { initial: 0 }));
+    // this.addControl('mod_depth', new Classic.InputControl('number', { initial: 0 }));
+    // this.addControl('initial_phase', new Classic.InputControl('number', { initial: 0 }));
     this.addOutput('signal', new Classic.Output(adsrSocket, 'Signal'));
-    this.addControl('tuning', new Classic.InputControl('number', { initial: 0 }));
-    this.addControl('mod_depth', new Classic.InputControl('number', { initial: 0 }));
-    this.addControl('initial_phase', new Classic.InputControl('number', { initial: 0 }));
+    this.addInput('adsr', new Classic.Input(adsrSocket, 'adsr'));
+    this.addInput('vca', new Classic.Input(vcaSocket, 'vca'));
+    this.addInput('noise', new Classic.Input(noiseSocket, 'noise'));
+
   }
 
   data() {
@@ -160,24 +166,22 @@ class VOCNode extends Classic.Node implements DataflowNode {
   }
 }
 
+type NodeData = {
+  value: number;
+};
 class MonophonicKeyboardNode extends Classic.Node implements DataflowNode {
   width = 200;
-  height = 200;
+  height = 120;
 
   constructor() {
     super('MonophonicKeyboard');
-    this.addControl('midi_f0', new Classic.InputControl('number', { initial: 0 }));
-    this.addControl('note_on_duration', new Classic.InputControl('number', { initial: 0 }));
-    this.addOutput('note_on_duration', new Classic.Output(adsrSocket, 'Number'));
+    this.addOutput('note_on_duration', new Classic.Output(adsrSocket, 'note_on_duration'));
   }
 
-  data() {
-    const midi_f0 = (this.controls['midi_f0'] as Classic.InputControl<'number'>).value;
-    const note_on_duration = (this.controls['note_on_duration'] as Classic.InputControl<'number'>).value;
-
+  data(): NodeData {
+    // 直接返回数字1作为输出
     return {
-      midi_f0,
-      note_on_duration
+      value: 1
     };
   }
 }
@@ -188,8 +192,7 @@ class VCANode extends Classic.Node implements DataflowNode {
 
   constructor() {
     super('VCA');
-    this.addInput('cv', new Classic.Input(adsrSocket, 'CV Input')); // 控制电压输入
-    this.addOutput('amplified_signal', new Classic.Output(adsrSocket, 'Amplified Signal'));
+    this.addOutput('vca', new Classic.Output(vcaSocket, 'vca'));
     this.addControl('gain', new Classic.InputControl('number', { initial: 1 })); // 增益
   }
 
@@ -205,13 +208,13 @@ class VCANode extends Classic.Node implements DataflowNode {
 }
 
 // LFONode 类
-class LFONode extends Classic.Node implements DataflowNode {
+class NoiseNode extends Classic.Node implements DataflowNode {
   width = 200;
   height = 180;
 
   constructor() {
-    super('LFO');
-    this.addOutput('modulation_signal', new Classic.Output(adsrSocket, 'Modulation Signal'));
+    super('Noise');
+    this.addOutput('noise', new Classic.Output(noiseSocket, 'noise'));
     this.addControl('frequency', new Classic.InputControl('number', { initial: 5 })); // 频率
     this.addControl('amplitude', new Classic.InputControl('number', { initial: 1 })); // 振幅
   }
@@ -267,9 +270,9 @@ export async function createEditor(container: HTMLElement) {
       ['Sustain', () => new SustainNode(0.7, process)],
       ['Release', () => new ReleaseNode(0.3, process)],
       ['ADSR', () => new ADSRNode()],
-      ['Voice', () => new VoiceNode()],
-      ['VOC', () => new VOCNode()],
-      ['LFO', () => new LFONode()],
+      ['Mixer', () => new MixerNode()],
+      ['VCO', () => new VCONode()],
+      ['Noise', () => new NoiseNode()],
       ['VCA', () => new VCANode()],
       ['MonophonicKeyboard', () => new MonophonicKeyboardNode()]
     ]),
@@ -292,38 +295,38 @@ export async function createEditor(container: HTMLElement) {
   let sustainNode = new SustainNode(0.7, process);
   let releaseNode = new ReleaseNode(0.3, process);
   const adsrNode = new ADSRNode();
-  const voiceNode = new VoiceNode();
-  const vocNode = new VOCNode();
+  const mixerNode = new MixerNode();
+  const vcoNode = new VCONode();
   const vcaNode = new VCANode();
-  const lfoNode = new LFONode();
+  const noiseNode = new NoiseNode();
   const keyboardNode = new MonophonicKeyboardNode();
+
 
   await editor.addNode(attackNode);
   await editor.addNode(decayNode);
   await editor.addNode(sustainNode);
   await editor.addNode(releaseNode);
   await editor.addNode(adsrNode);
-  await editor.addNode(voiceNode);
-  await editor.addNode(vocNode);
+  await editor.addNode(mixerNode);
+  await editor.addNode(vcoNode);
   await editor.addNode(vcaNode);
-  await editor.addNode(lfoNode);
+  await editor.addNode(noiseNode);
   await editor.addNode(keyboardNode);
 
   await editor.addConnection(new Connection(attackNode, 'value', adsrNode, 'attack'));
   await editor.addConnection(new Connection(decayNode, 'value', adsrNode, 'decay'));
   await editor.addConnection(new Connection(sustainNode, 'value', adsrNode, 'sustain'));
   await editor.addConnection(new Connection(releaseNode, 'value', adsrNode, 'release'));
-  await editor.addConnection(new Connection(adsrNode, 'signal', voiceNode, 'ADSR'));
-  await editor.addConnection(new Connection(vocNode, 'signal', voiceNode, 'VOC'));
-  await editor.addConnection(new Connection(vcaNode, 'signal', voiceNode, 'VCA'));
-  await editor.addConnection(new Connection(lfoNode, 'signal', voiceNode, 'LFO'));
-  await editor.addConnection(new Connection(keyboardNode, 'note_on_duration', adsrNode, 'alpha'));
+  await editor.addConnection(new Connection(adsrNode, 'signal',vcoNode, 'adsr'));
+  await editor.addConnection(new Connection(vcoNode, 'signal', mixerNode, 'signal'));
+  await editor.addConnection(new Connection(vcaNode, 'vca', vcoNode, 'vca'));
+  await editor.addConnection(new Connection(noiseNode, 'noise', vcoNode, 'noise'));
+  await editor.addConnection(new Connection(keyboardNode, 'note_on_duration', adsrNode, 'input'));
 
   const arrange = new AutoArrangePlugin<Schemes>();
-  arrange.addPreset(ArrangePresets.classic.setup());
+  arrange.addPreset(ArrangePresets.classic.setup({ spacing: 80 }));
   area.use(arrange);
   await arrange.layout();
-
   AreaExtensions.zoomAt(area, editor.getNodes());
   AreaExtensions.simpleNodesOrder(area);
 
@@ -356,7 +359,7 @@ async function process() {
   const decayValue = decayNode.data().value ?? 0;
   const sustainValue = sustainNode.data().value ?? 0;
   const releaseValue = releaseNode.data().value ?? 0;
-  const alphaValue = keyboardNode.data().note_on_duration ?? 0;
+  const alphaValue = keyboardNode.data().value ?? 0;
 
   // 将收集到的数据发送到后端
   const adsrData = {

@@ -12,25 +12,29 @@ import numpy as np
 import os
 from flask import send_file
 
-# 音频和图片文件保存位置
+# location of audio folder and image folder
 AUDIO_FOLDER = "/Users/linyafeng/Desktop"
-IMAGE_FOLDER = "/Users/linyafeng/Desktop/images"  # 图片保存位置
-os.makedirs(IMAGE_FOLDER, exist_ok=True)  # 创建图片文件夹
+IMAGE_FOLDER = "/Users/linyafeng/Desktop/images"
+FILE_NAME_TEMPLATE = "output_{}.wav"
+os.makedirs(IMAGE_FOLDER, exist_ok=True)
+# create if not exist
 
 
+# create flask as backend, interact with frontend via HTTP
 app = Flask(__name__)
+# Cross-Origin Resource Sharing CORS: allow frontend to interact with backend
 CORS(app)
 
-# 音频文件保存位置
-AUDIO_FOLDER = "/Users/linyafeng/Desktop"
-FILE_NAME_TEMPLATE = "output_{}.wav"
 
-# SynthConfig设置
+# Synth Configuration
 synthconfig1 = torchsynth.config.SynthConfig(
     batch_size=1, reproducible=False, sample_rate=44100, buffer_size_seconds=4.0
 )
-device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+device ="cpu"
 voice1 = Voice(synthconfig=synthconfig1).to(device)
+# create an instance of voice synth ma move it to the desired device
 keyboard = MonophonicKeyboard(synthconfig=synthconfig1, device=device)
 sine = SineVCO(
     tuning=torch.tensor([0.0] * synthconfig1.batch_size),
@@ -87,65 +91,6 @@ def update_adsr():
         print(f"Error updating ADSR parameters: {e}")
         return jsonify({"status": "error", "message": "Parameter out of range"}), 400
 
-# @app.route('/generate_audio', methods=['POST'])
-# def generate_audio():
-#     try:
-#         request_data = request.json
-#         midi_note = request_data.get("midi_note", 69)
-#
-#         # 调整ADSR参数，使其变化显著但不过度
-#         print(f"Using ADSR parameters for audio generation: {current_adsr}")
-#         attack_value = min(max(current_adsr['attack'] * 2, 0.0), 1.0)
-#         decay_value = min(max(current_adsr['decay'] * 2, 0.0), 1.0)
-#         sustain_value = min(max(current_adsr['sustain'], 0.0), 1.0)
-#         release_value = min(max(current_adsr['release'] * 2, 0.0), 1.0)
-#
-#         # 更新ADSR参数
-#         voice1.adsr_1.set_parameter("attack", torch.tensor([attack_value]))
-#         voice1.adsr_1.set_parameter("decay", torch.tensor([decay_value]))
-#         voice1.adsr_1.set_parameter("sustain", torch.tensor([sustain_value]))
-#         voice1.adsr_1.set_parameter("release", torch.tensor([release_value]))
-#
-#         # 重置或刷新合成器状态，确保应用最新参数
-#         if hasattr(voice1, 'reset_parameters'):
-#             voice1.reset_parameters()
-#             print("Voice parameters reset.")
-#
-#         # 设置合成器的其他参数
-#         voice1.set_parameters({
-#             ("keyboard", "midi_f0"): torch.tensor([midi_note]),
-#             ("keyboard", "duration"): torch.tensor([1.0]),
-#             ("vco_1", "tuning"): torch.tensor([0.0]),
-#             ("vco_1", "mod_depth"): torch.tensor([12.0]),
-#         })
-#
-#         # 生成音频并确保使用最新参数
-#         env = torch.zeros((synthconfig1.batch_size, synthconfig1.buffer_size), device=device)
-#         midi_f0, note_on_duration = keyboard()
-#         sine_out = sine(midi_f0, env)
-#         sqr_out = square_saw(midi_f0, env)
-#         noise_out = noise()
-#
-#         # 应用包络并生成音频
-#         audio_out, parameters, is_train = voice1()
-#         audio_tensor = audio_out.detach().cpu()
-#
-#         if audio_tensor.ndim == 3:
-#             audio_tensor = audio_tensor.squeeze(0)
-#
-#         # 打印生成的音频参数用于调试
-#         print(f"Generated audio with parameters: attack={attack_value}, decay={decay_value}, sustain={sustain_value}, release={release_value}")
-#
-#         # 保存音频为WAV文件
-#         audio_path = f"{AUDIO_FOLDER}/{FILE_NAME_TEMPLATE.format(midi_note)}"
-#         torchaudio.save(audio_path, audio_tensor, 44100)
-#         return jsonify({"status": "success", "url": f"/audio/{FILE_NAME_TEMPLATE.format(midi_note)}"}), 200
-#
-#     except Exception as e:
-#         # 捕获并打印详细的异常信息
-#         print(f"Error generating audio: {str(e)}")
-#         return jsonify({"status": "error", "message": str(e)}), 500
-import numpy as np
 
 @app.route('/generate_audio', methods=['POST'])
 def generate_audio():

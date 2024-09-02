@@ -1,8 +1,10 @@
 #piano {
     display: flex;
+    justify-content: center; /* 中心对齐 */
     position: relative;
-    width: 600px;
+    width: 600px; /* 根据需要调整宽度 */
     height: 200px;
+    margin: 0 auto; /* 使键盘居中 */
 }
 
 .key {
@@ -24,19 +26,27 @@
     height: 60%;
     position: absolute;
     z-index: 2;
-    margin-left: -15px;
+    margin-left: -15px; /* 调整黑键的宽度使其居中 */
     margin-top: 0;
 }
 
-/* Adjusting the positioning of black keys */
-.key.black:nth-child(2),
-.key.black:nth-child(4),
-.key.black:nth-child(7),
-.key.black:nth-child(9),
-.key.black:nth-child(11) {
-    left: 35px;
+/* 手动调整黑键位置 */
+.key.black:nth-of-type(2) {
+    left: 37px; /* 第一个黑键 */
 }
 
-.key.white + .key.black {
-    margin-left: -15px;
+.key.black:nth-of-type(4) {
+    left: 87px; /* 第二个黑键 */
+}
+
+.key.black:nth-of-type(6) {
+    left: 187px; /* 第三个黑键 */
+}
+
+.key.black:nth-of-type(8) {
+    left: 237px; /* 第四个黑键 */
+}
+
+.key.black:nth-of-type(10) {
+    left: 287px; /* 第五个黑键 */
 }
