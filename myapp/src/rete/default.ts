@@ -1,253 +1,256 @@
-import { ClassicPreset as Classic, GetSchemes, NodeEditor } from 'rete';
-import { Area2D, AreaExtensions, AreaPlugin } from 'rete-area-plugin';
-import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
-import { ReactPlugin, ReactArea2D, Presets as ReactPresets } from 'rete-react-plugin';
-import { createRoot } from 'react-dom/client';
-import { DataflowEngine, DataflowNode } from 'rete-engine';
-import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
-import { ContextMenuPlugin, ContextMenuExtra, Presets as ContextMenuPresets } from 'rete-context-menu-plugin';
+import {ClassicPreset as Classic, GetSchemes, NodeEditor} from 'rete';
+import {Area2D, AreaExtensions, AreaPlugin} from 'rete-area-plugin';
+import {ConnectionPlugin, Presets as ConnectionPresets} from 'rete-connection-plugin';
+import {ReactPlugin, ReactArea2D, Presets as ReactPresets} from 'rete-react-plugin';
+import {createRoot} from 'react-dom/client';
+import {DataflowEngine, DataflowNode} from 'rete-engine';
+import {AutoArrangePlugin, Presets as ArrangePresets} from 'rete-auto-arrange-plugin';
+import {ContextMenuPlugin, ContextMenuExtra, Presets as ContextMenuPresets} from 'rete-context-menu-plugin';
 
 const adsrSocket = new Classic.Socket('adsrSocket');
-const noiseSocket= new Classic.Socket('noiseSocket');
+const noiseSocket = new Classic.Socket('noiseSocket');
 const vcaSocket = new Classic.Socket('vcaSocket');
 // node and connection
-type Node = AttackNode | DecayNode | SustainNode | ReleaseNode | ADSRNode | MixerNode | VCONode | MonophonicKeyboardNode | NoiseNode | VCANode;
-class Connection<A extends Node, B extends Node> extends Classic.Connection<A, B> {}
+type Node =
+    AttackNode
+    | DecayNode
+    | SustainNode
+    | ReleaseNode
+    | ADSRNode
+    | MixerNode
+    | VCONode
+    | MonophonicKeyboardNode
+    | NoiseNode
+    | VCANode;
+
+class Connection<A extends Node, B extends Node> extends Classic.Connection<A, B> {
+}
+
 type Conn =
-  | Connection<MonophonicKeyboardNode, ADSRNode>
-  | Connection<AttackNode, ADSRNode>
-  | Connection<DecayNode, ADSRNode>
-  | Connection<SustainNode, ADSRNode>
-  | Connection<ReleaseNode, ADSRNode>
-  | Connection<ADSRNode, VCONode>
-  | Connection<NoiseNode, VCONode>
-  | Connection<VCANode, VCONode>
-  | Connection<VCONode, MixerNode>;
+    | Connection<MonophonicKeyboardNode, ADSRNode>
+    | Connection<AttackNode, ADSRNode>
+    | Connection<DecayNode, ADSRNode>
+    | Connection<SustainNode, ADSRNode>
+    | Connection<ReleaseNode, ADSRNode>
+    | Connection<ADSRNode, VCONode>
+    | Connection<NoiseNode, VCONode>
+    | Connection<VCANode, VCONode>
+    | Connection<VCONode, MixerNode>;
 type Schemes = GetSchemes<Node, Conn>;
 
 
-class ADSRComponentNode extends Classic.Node implements DataflowNode {
-  width = 180;
-  height = 120;
+class AttackNode extends Classic.Node implements DataflowNode {
+    width = 180;
+    height = 120;
 
-  constructor(name: string, initial: number, change?: (value: number) => void) {
-    super(name);
-    this.addOutput('value', new Classic.Output(adsrSocket, 'Number'));
-    this.addControl('value', new Classic.InputControl('number', { initial, change }));
-  }
+    constructor(initial: number, change?: (value: number) => void) {
+        super('Attack');
+        this.addOutput('attackOutput', new Classic.Output(adsrSocket, 'Number'));
+        this.addControl('value', new Classic.InputControl('number', {initial, change}));
+    }
 
-  data() {
-    const value = (this.controls['value'] as Classic.InputControl<'number'>).value;
-    return { value };
-  }
+    data() {
+        const value: number | undefined = (this.controls['value'] as Classic.InputControl<'number'>).value;
+        return {value};
+    }
+
 }
 
-class AttackNode extends ADSRComponentNode {
-  constructor(initial: number, change?: (value: number) => void) {
-    super('Attack', initial, change);
-  }
+class DecayNode extends Classic.Node implements DataflowNode {
+    width = 180;
+    height = 120;
+
+    constructor(initial: number, change?: (value: number) => void) {
+        super('Decay');
+        this.addOutput('decayOutput', new Classic.Output(adsrSocket, 'Number'));
+        this.addControl('value', new Classic.InputControl('number', {initial, change}));
+
+    }
+
+    data() {
+        const value: number | undefined = (this.controls['value'] as Classic.InputControl<'number'>).value;
+        return {value};
+    }
+
+
 }
 
-class DecayNode extends ADSRComponentNode {
-  constructor(initial: number, change?: (value: number) => void) {
-    super('Decay', initial, change);
-  }
+class SustainNode extends Classic.Node implements DataflowNode {
+    width = 180;
+    height = 120;
+
+    constructor(initial: number, change?: (value: number) => void) {
+        super('Sustain');
+        this.addOutput('sustainOutput', new Classic.Output(adsrSocket, 'Number'));
+        this.addControl('value', new Classic.InputControl('number', {initial, change}));
+
+
+    }
+
+    data() {
+        const value: number | undefined = (this.controls['value'] as Classic.InputControl<'number'>).value;
+        return {value};
+    }
+
+
 }
 
-class SustainNode extends ADSRComponentNode {
-  constructor(initial: number, change?: (value: number) => void) {
-    super('Sustain', initial, change);
-  }
-}
+class ReleaseNode extends Classic.Node implements DataflowNode {
+    width = 180;
+    height = 120;
 
-class ReleaseNode extends ADSRComponentNode {
-  constructor(initial: number, change?: (value: number) => void) {
-    super('Release', initial, change);
-  }
+    constructor(initial: number, change?: (value: number) => void) {
+        super('Release');
+        this.addOutput('releaseOutput', new Classic.Output(adsrSocket, 'Number'));
+        this.addControl('value', new Classic.InputControl('number', {initial, change}));
+    }
+
+    data() {
+        const value: number | undefined = (this.controls['value'] as Classic.InputControl<'number'>).value;
+        return {value};
+    }
+
 }
 
 class ADSRNode extends Classic.Node implements DataflowNode {
-  width = 200;
-  height = 280;
+    width = 200;
+    height = 280;
 
-  constructor() {
-    super('ADSR');
-    this.addInput('attack', new Classic.Input(adsrSocket, 'Attack'));
-    this.addInput('decay', new Classic.Input(adsrSocket, 'Decay'));
-    this.addInput('sustain', new Classic.Input(adsrSocket, 'Sustain'));
-    this.addInput('release', new Classic.Input(adsrSocket, 'Release'));
-    this.addInput('input', new Classic.Input(adsrSocket, 'input'));
-    this.addOutput('signal', new Classic.Output(adsrSocket, 'Signal'));
-  }
+    constructor() {
+        super('ADSR');
+        this.addInput('inputFromAttack', new Classic.Input(adsrSocket, 'Attack'));
+        this.addInput('inputFromDecay', new Classic.Input(adsrSocket, 'Decay'));
+        this.addInput('inputFromSustain', new Classic.Input(adsrSocket, 'Sustain'));
+        this.addInput('inputFromRelease', new Classic.Input(adsrSocket, 'Release'));
+        this.addInput('inputFromKeyboard', new Classic.Input(adsrSocket, 'input'));
+        this.addOutput('adsrOutput', new Classic.Output(adsrSocket, 'Signal'));
+    }
+    data() {
+        const value = 1;
+        return {value};
+    }
 
-  data(inputs: { attack?: number[]; decay?: number[]; sustain?: number[]; release?: number[]; alpha?: number[] }) {
-    const { attack = [], decay = [], sustain = [], release = [], alpha = [] } = inputs;
-
-    const adsrData = {
-      attack: attack[0] || 0,
-      decay: decay[0] || 0,
-      sustain: sustain[0] || 0,
-      release: release[0] || 0,
-      alpha: alpha[0] || 0
-    };
-
-    console.log('ADSR data:', adsrData);
-
-    // 实时发送到后端
-    fetch('http://localhost:5000/update_adsr', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(adsrData)
-    })
-      .then(response => response.json())
-      .then(data => {
-        console.log('Success:', data);
-      })
-      .catch((error) => {
-        console.error('Error:', error);
-      });
-
-    return adsrData;
-  }
 }
 
 class MixerNode extends Classic.Node implements DataflowNode {
-  width = 180;
-  height = 140;
+    width = 180;
+    height = 140;
 
-  constructor() {
-    super('Mixer');
-    this.addInput('signal', new Classic.Input(adsrSocket, 'Signal'));
-  }
+    constructor() {
+        super('Mixer');
+        this.addInput('inputFromVco', new Classic.Input(adsrSocket, 'Signal'));
+    }
 
-  data(inputs: { signal?: never[]; voc?: never[] }) {
-    const { signal = [], voc = [] } = inputs;
+    data(inputs: { signal?: never[]; voc?: never[] }) {
+        const {signal = [], voc = []} = inputs;
 
-    const voiceData = {
-      signal: signal[0] || {},
-      voc: voc[0] || {}
-    };
+        const voiceData = {
+            signal: signal[0] || {},
+            voc: voc[0] || {}
+        };
 
-    console.log('Voice data:', voiceData);
+        console.log('Voice data:', voiceData);
 
-    return voiceData;
-  }
+        return voiceData;
+    }
+
 }
 
 class VCONode extends Classic.Node implements DataflowNode {
-  width = 200;
-  height = 250;
+    width = 200;
+    height = 250;
 
-  constructor() {
-    super('VCO');
-    // this.addOutput('signal', new Classic.Output(adsrSocket, 'Signal'));
-    // this.addControl('tuning', new Classic.InputControl('number', { initial: 0 }));
-    // this.addControl('mod_depth', new Classic.InputControl('number', { initial: 0 }));
-    // this.addControl('initial_phase', new Classic.InputControl('number', { initial: 0 }));
-    this.addOutput('signal', new Classic.Output(adsrSocket, 'Signal'));
-    this.addInput('adsr', new Classic.Input(adsrSocket, 'adsr'));
-    this.addInput('vca', new Classic.Input(vcaSocket, 'vca'));
-    this.addInput('noise', new Classic.Input(noiseSocket, 'noise'));
+    constructor() {
+        super('VCO');
+        this.addOutput('vcoOutput', new Classic.Output(adsrSocket, 'Signal'));
+        this.addInput('inputFromAdsr', new Classic.Input(adsrSocket, 'adsr'));
+        this.addInput('inputFromVca', new Classic.Input(vcaSocket, 'vca'));
+        this.addInput('inputFromNoise', new Classic.Input(noiseSocket, 'noise'));
 
-  }
+    }
 
-  data() {
-    const tuning = (this.controls['tuning'] as Classic.InputControl<'number'>).value;
-    const mod_depth = (this.controls['mod_depth'] as Classic.InputControl<'number'>).value;
-    const initial_phase = (this.controls['initial_phase'] as Classic.InputControl<'number'>).value;
+    data() {
+        const tuning = (this.controls['tuning'] as Classic.InputControl<'number'>).value;
+        const mod_depth = (this.controls['mod_depth'] as Classic.InputControl<'number'>).value;
+        const initial_phase = (this.controls['initial_phase'] as Classic.InputControl<'number'>).value;
 
-    return {
-      tuning,
-      mod_depth,
-      initial_phase
-    };
-  }
+        return {
+            tuning,
+            mod_depth,
+            initial_phase
+        };
+    }
+
 }
 
-type NodeData = {
-  value: number;
-};
+
 class MonophonicKeyboardNode extends Classic.Node implements DataflowNode {
-  width = 200;
-  height = 120;
+    width = 200;
+    height = 120;
 
-  constructor() {
-    super('MonophonicKeyboard');
-    this.addOutput('note_on_duration', new Classic.Output(adsrSocket, 'note_on_duration'));
-  }
+    constructor() {
+        super('MonophonicKeyboard');
+        this.addOutput('keyboardOutput', new Classic.Output(adsrSocket, 'note_on_duration'));
+    }
 
-  data(): NodeData {
-    // 直接返回数字1作为输出
-    return {
-      value: 1
-    };
-  }
+    data() {
+        const value: number | undefined = 1;
+        return {value};
+    }
+
 }
 
 class VCANode extends Classic.Node implements DataflowNode {
-  width = 180;
-  height = 150;
+    width = 180;
+    height = 150;
 
-  constructor() {
-    super('VCA');
-    this.addOutput('vca', new Classic.Output(vcaSocket, 'vca'));
-    this.addControl('gain', new Classic.InputControl('number', { initial: 1 })); // 增益
-  }
+    constructor(initial: number, change?: (value: number) => void) {
+        super('VCA');
+        this.addOutput('vcaOutput', new Classic.Output(vcaSocket, 'vca'));
+        this.addControl('value', new Classic.InputControl('number', {initial, change})); // 增益
+    }
 
-  data(inputs: { cv?: number[] }) {
-    const cv = inputs.cv?.[0] || 0;
-    const gain = (this.controls['gain'] as Classic.InputControl<'number'>).value ?? 1;
+    data() {
+        const value: number | undefined = (this.controls['value'] as Classic.InputControl<'number'>).value;
+        return {value};
+    }
 
-    return {
-      amplified_signal: cv * gain, // 放大后的信号
-      gain
-    };
-  }
 }
 
-// LFONode 类
 class NoiseNode extends Classic.Node implements DataflowNode {
-  width = 200;
-  height = 180;
+    width = 200;
+    height = 180;
 
-  constructor() {
-    super('Noise');
-    this.addOutput('noise', new Classic.Output(noiseSocket, 'noise'));
-    this.addControl('frequency', new Classic.InputControl('number', { initial: 5 })); // 频率
-    this.addControl('amplitude', new Classic.InputControl('number', { initial: 1 })); // 振幅
-  }
+    constructor(initial: number, change?: (value: number) => void) {
+        super('Noise');
+        this.addOutput('noiseOutput', new Classic.Output(noiseSocket, 'seed'));
+        this.addControl('value', new Classic.InputControl('number', {initial, change})); // 振幅
+    }
 
-  data() {
-    const frequency = (this.controls['frequency'] as Classic.InputControl<'number'>).value;
-    const amplitude = (this.controls['amplitude'] as Classic.InputControl<'number'>).value;
+    data() {
+        const value: number | undefined = (this.controls['value'] as Classic.InputControl<'number'>).value;
+        return {value};
+    }
 
-    return {
-      modulation_signal: {}, // 输出调制信号
-      frequency,
-      amplitude
-    };
-  }
 }
 
 export function handlePianoNotePressed(note: number) {
-  console.log('Note received in TypeScript:', note);
+    console.log('Note received in TypeScript:', note);
 
-  fetch('/play_note', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ note })
-  })
-    .then(response => response.json())
-    .then(data => {
-      console.log('Note played successfully:', data);
+    fetch('/play_note', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({note})
     })
-    .catch(error => {
-      console.error('Error playing note:', error);
-    });
+        .then(response => response.json())
+        .then(data => {
+            console.log('Note played successfully:', data);
+        })
+        .catch(error => {
+            console.error('Error playing note:', error);
+        });
 }
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -256,138 +259,196 @@ export function handlePianoNotePressed(note: number) {
 
 type AreaExtra = Area2D<Schemes> | ReactArea2D<Schemes> | ContextMenuExtra;
 
+
+//---------------------------------------------------------
+// the core function
 export async function createEditor(container: HTMLElement) {
-  console.log('createEditor called with container:', container);
-  const editor = new NodeEditor<Schemes>();
-  const area = new AreaPlugin<Schemes, AreaExtra>(container);
-  const connection = new ConnectionPlugin<Schemes, AreaExtra>();
-  const reactRender = new ReactPlugin<Schemes, AreaExtra>({ createRoot });
+    console.log('createEditor called with container:', container);
+    const editor = new NodeEditor<Schemes>();
+    const area = new AreaPlugin<Schemes, AreaExtra>(container);
+    const connection = new ConnectionPlugin<Schemes, AreaExtra>();
+    const reactRender = new ReactPlugin<Schemes, AreaExtra>({createRoot});
 
-  const contextMenu = new ContextMenuPlugin<Schemes>({
-    items: ContextMenuPresets.classic.setup([
-      ['Attack', () => new AttackNode(0.1, process)],
-      ['Decay', () => new DecayNode(0.2, process)],
-      ['Sustain', () => new SustainNode(0.7, process)],
-      ['Release', () => new ReleaseNode(0.3, process)],
-      ['ADSR', () => new ADSRNode()],
-      ['Mixer', () => new MixerNode()],
-      ['VCO', () => new VCONode()],
-      ['Noise', () => new NoiseNode()],
-      ['VCA', () => new VCANode()],
-      ['MonophonicKeyboard', () => new MonophonicKeyboardNode()]
-    ]),
-  });
-
-  editor.use(area);
-  area.use(reactRender);
-  area.use(connection);
-  area.use(contextMenu);
-
-  connection.addPreset(ConnectionPresets.classic.setup());
-  reactRender.addPreset(ReactPresets.classic.setup());
-  reactRender.addPreset(ReactPresets.contextMenu.setup());
-
-  const dataflow = new DataflowEngine<Schemes>();
-  editor.use(dataflow);
-
-  let attackNode = new AttackNode(0.1, process);
-  let decayNode = new DecayNode(0.2, process);
-  let sustainNode = new SustainNode(0.7, process);
-  let releaseNode = new ReleaseNode(0.3, process);
-  const adsrNode = new ADSRNode();
-  const mixerNode = new MixerNode();
-  const vcoNode = new VCONode();
-  const vcaNode = new VCANode();
-  const noiseNode = new NoiseNode();
-  const keyboardNode = new MonophonicKeyboardNode();
-
-
-  await editor.addNode(attackNode);
-  await editor.addNode(decayNode);
-  await editor.addNode(sustainNode);
-  await editor.addNode(releaseNode);
-  await editor.addNode(adsrNode);
-  await editor.addNode(mixerNode);
-  await editor.addNode(vcoNode);
-  await editor.addNode(vcaNode);
-  await editor.addNode(noiseNode);
-  await editor.addNode(keyboardNode);
-
-  await editor.addConnection(new Connection(attackNode, 'value', adsrNode, 'attack'));
-  await editor.addConnection(new Connection(decayNode, 'value', adsrNode, 'decay'));
-  await editor.addConnection(new Connection(sustainNode, 'value', adsrNode, 'sustain'));
-  await editor.addConnection(new Connection(releaseNode, 'value', adsrNode, 'release'));
-  await editor.addConnection(new Connection(adsrNode, 'signal',vcoNode, 'adsr'));
-  await editor.addConnection(new Connection(vcoNode, 'signal', mixerNode, 'signal'));
-  await editor.addConnection(new Connection(vcaNode, 'vca', vcoNode, 'vca'));
-  await editor.addConnection(new Connection(noiseNode, 'noise', vcoNode, 'noise'));
-  await editor.addConnection(new Connection(keyboardNode, 'note_on_duration', adsrNode, 'input'));
-
-  const arrange = new AutoArrangePlugin<Schemes>();
-  arrange.addPreset(ArrangePresets.classic.setup({ spacing: 80 }));
-  area.use(arrange);
-  await arrange.layout();
-  AreaExtensions.zoomAt(area, editor.getNodes());
-  AreaExtensions.simpleNodesOrder(area);
-
-  const selector = AreaExtensions.selector();
-  const accumulating = AreaExtensions.accumulateOnCtrl();
-  AreaExtensions.selectableNodes(area, selector, { accumulating });
-
-  //--------------------------------------------------------
-  //communication with backend
-  async function sendToBackend(adsrData: { attack: number; decay: number; sustain: number; release: number; alpha: number }) {
-  try {
-    console.log('Sending data to backend:', adsrData); // 调试信息
-    const response = await fetch('http://localhost:5000/update_adsr', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(adsrData)
+    const contextMenu = new ContextMenuPlugin<Schemes>({
+        items: ContextMenuPresets.classic.setup([
+            ['Attack', () => new AttackNode(0, () => process)],
+            ['Decay', () => new DecayNode(0, () => process)],
+            ['Sustain', () => new SustainNode(0, () => process)],
+            ['Release', () => new ReleaseNode(0, () => process)],
+            ['ADSR', () => new ADSRNode()],
+            ['Mixer', () => new MixerNode()],
+            ['VCO', () => new VCONode()],
+            ['Noise', () => new NoiseNode(1, process)],
+            ['VCA', () => new VCANode(1, process)],
+            ['MonophonicKeyboard', () => new MonophonicKeyboardNode()]
+        ]),
     });
 
-    const data = await response.json();
-    console.log('Backend response:', data);
-  } catch (error) {
-    console.error('Error sending data to backend:', error);
-  }
-}
-async function process() {
-  // 从各个节点获取数据
-  const attackValue = attackNode.data().value ?? 0;
-  const decayValue = decayNode.data().value ?? 0;
-  const sustainValue = sustainNode.data().value ?? 0;
-  const releaseValue = releaseNode.data().value ?? 0;
-  const alphaValue = keyboardNode.data().value ?? 0;
+    editor.use(area);
+    area.use(reactRender);
+    area.use(connection);
+    area.use(contextMenu);
 
-  // 将收集到的数据发送到后端
-  const adsrData = {
-    attack: attackValue,
-    decay: decayValue,
-    sustain: sustainValue,
-    release: releaseValue,
-    alpha: alphaValue
-  };
+    connection.addPreset(ConnectionPresets.classic.setup());
+    reactRender.addPreset(ReactPresets.classic.setup());
+    reactRender.addPreset(ReactPresets.contextMenu.setup());
 
-  await sendToBackend(adsrData);
-}
+    const dataflow = new DataflowEngine<Schemes>();
+    editor.use(dataflow);
 
-  attackNode = new AttackNode(0.1, () => process());
-  decayNode = new DecayNode(0.2, () => process());
-  sustainNode = new SustainNode(0.7, () => process());
-  releaseNode = new ReleaseNode(0.3, () => process());
+    const attackNode = new AttackNode(0, process);
+    const decayNode = new DecayNode(0, process);
+    const sustainNode = new SustainNode(0, process);
+    const releaseNode = new ReleaseNode(0, process);
+    const noiseNode = new NoiseNode(1, process);
+    const vcaNode = new VCANode(1, process);
+    const adsrNode = new ADSRNode();
+    const mixerNode = new MixerNode();
+    const vcoNode = new VCONode();
+    const keyboardNode = new MonophonicKeyboardNode();
+
+
+    await editor.addNode(attackNode);
+    await editor.addNode(decayNode);
+    await editor.addNode(sustainNode);
+    await editor.addNode(releaseNode);
+    await editor.addNode(adsrNode);
+    await editor.addNode(mixerNode);
+    await editor.addNode(vcoNode);
+    await editor.addNode(vcaNode);
+    await editor.addNode(noiseNode);
+    await editor.addNode(keyboardNode);
+
+    await editor.addConnection(new Connection(attackNode, 'attackOutput', adsrNode, 'inputFromAttack'));
+    await editor.addConnection(new Connection(decayNode, 'decayOutput', adsrNode, 'inputFromDecay'));
+    await editor.addConnection(new Connection(sustainNode, 'sustainOutput', adsrNode, 'inputFromSustain'));
+    await editor.addConnection(new Connection(releaseNode, 'releaseOutput', adsrNode, 'inputFromRelease'));
+    await editor.addConnection(new Connection(adsrNode, 'adsrOutput', vcoNode, 'inputFromAdsr'));
+    await editor.addConnection(new Connection(vcoNode, 'vcoOutput', mixerNode, 'inputFromVco'));
+    await editor.addConnection(new Connection(vcaNode, 'vcaOutput', vcoNode, 'inputFromVca'));
+    await editor.addConnection(new Connection(noiseNode, 'noiseOutput', vcoNode, 'inputFromNoise'));
+    await editor.addConnection(new Connection(keyboardNode, 'keyboardOutput', adsrNode, 'inputFromKeyboard'));
+
+    const arrange = new AutoArrangePlugin<Schemes>();
+    arrange.addPreset(ArrangePresets.classic.setup({spacing: 80}));
+    area.use(arrange);
+    await arrange.layout();
+    AreaExtensions.zoomAt(area, editor.getNodes());
+    AreaExtensions.simpleNodesOrder(area);
+
+    const selector = AreaExtensions.selector();
+    const accumulating = AreaExtensions.accumulateOnCtrl();
+    AreaExtensions.selectableNodes(area, selector, {accumulating});
+
+    //--------------------------------------------------------
+    //communication with backend
+    async function sendToBackend(adsrData: {
+        attack: number;
+        decay: number;
+        sustain: number;
+        release: number;
+        keyboard: number;
+        vca: number;
+        noise: number
+    }) {
+        try {
+            console.log('Sending data to backend:', adsrData); // 调试信息
+            const response = await fetch('http://localhost:5000/update_adsr', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(adsrData)
+            });
+
+            const data = await response.json();
+            console.log('Backend response:', data);
+        } catch (error) {
+            console.error('Error sending data to backend:', error);
+        }
+    }
+
+    async function process() {
+
+        // First test if connection is established
+        // console.log(editor.getConnections())
+
+        interface Conns {
+            sourceOutput: string;
+            targetInput: string;
+            // 其他属性如 id, source, target 等，可以根据需要添加
+        }
+
+        function isConnectionExist(
+            connections: Conns[],
+            sourceOutput: string,
+            targetInput: string
+        ): boolean {
+            return connections.some(
+                (conn) => conn.sourceOutput === sourceOutput && conn.targetInput === targetInput
+            );
+        }
+
+        // 从各个节点获取数据
+        let attackValue = attackNode.data().value ?? 0;
+        let decayValue = decayNode.data().value ?? 0;
+        let sustainValue = sustainNode.data().value ?? 0;
+        let releaseValue = releaseNode.data().value ?? 0;
+        let keyboardValue = keyboardNode.data().value ?? 0;
+        let vcaValue = vcaNode.data().value ?? 0;
+        let noiseValue = noiseNode.data().value ?? 0;
+        // console.log('调试信息 attack'+attackNode.data().value);
+        // console.log('调试信息 vca'+vcaNode.data().value);
+        // 将收集到的数据发送到后端
+        const connections: Conns[] = editor.getConnections(); // 确保 getConnections() 返回的类型匹配
+
+        const exists = isConnectionExist(connections, 'decayOutput', 'inputFromDecay');
+        console.log(`Connection from 'decayOutput' to 'inputFromDecay' exists: ${exists}`);
+        if (!isConnectionExist(connections, 'attackOutput', 'inputFromAttack') || !isConnectionExist(connections, 'adsrOutput', 'inputFromAdsr')) {
+            attackValue = NaN;
+        }
+        if (!isConnectionExist(connections, 'decayOutput', 'inputFromDecay') || !isConnectionExist(connections, 'adsrOutput', 'inputFromAdsr')) {
+            decayValue = NaN;
+        }
+        if (!isConnectionExist(connections, 'sustainOutput', 'inputFromSustain') || !isConnectionExist(connections, 'adsrOutput', 'inputFromAdsr')) {
+            sustainValue = NaN;
+        }
+        if (!isConnectionExist(connections, 'releaseOutput', 'inputFromRelease') || !isConnectionExist(connections, 'adsrOutput', 'inputFromAdsr')) {
+            releaseValue = NaN;
+        }
+        if (!isConnectionExist(connections, 'keyboardOutput', 'inputFromKeyboard') || !isConnectionExist(connections, 'adsrOutput', 'inputFromAdsr') || !isConnectionExist(connections, 'vcoOutput', 'inputFromVco')) {
+            keyboardValue = NaN;
+        }
+        if (!isConnectionExist(connections, 'vcaOutput', 'inputFromVca')) {
+            vcaValue = NaN;
+        }
+        if (!isConnectionExist(connections, 'noiseOutput', 'inputFromNoise')) {
+            noiseValue = NaN;
+        }
+
+        const Data = {
+            attack: attackValue,
+            decay: decayValue,
+            sustain: sustainValue,
+            release: releaseValue,
+            keyboard: keyboardValue,
+            vca: vcaValue,
+            noise: noiseValue
+        };
+
+        await sendToBackend(Data);
+    }
 
 // 每次输入变化时触发 `process()` 函数，确保数据实时发送
-editor.addPipe((context) => {
-  if (context.type === 'connectioncreated' || context.type === 'connectionremoved') {
-    process();
-  }
-  return context;
-});
+    editor.addPipe((context) => {
+        if (context.type === 'connectioncreated' || context.type === 'connectionremoved') {
+            process();
+        }
+        return context;
+    });
 
-process();
-  return {
-    destroy: () => area.destroy(),
-  };
+    process();
+    return {
+        destroy: () => area.destroy(),
+    };
 }
