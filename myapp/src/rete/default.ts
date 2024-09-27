@@ -342,7 +342,7 @@ export async function createEditor(container: HTMLElement) {
 
     //--------------------------------------------------------
     //communication with backend
-    async function sendToBackend(adsrData: {
+    async function sendToBackend(Data: {
         attack: number;
         decay: number;
         sustain: number;
@@ -352,13 +352,13 @@ export async function createEditor(container: HTMLElement) {
         noise: number
     }) {
         try {
-            console.log('Sending data to backend:', adsrData); // 调试信息
+            console.log('Sending data to backend:', Data); // 调试信息
             const response = await fetch('http://localhost:5000/update_adsr', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(adsrData)
+                body: JSON.stringify(Data)
             });
 
             const data = await response.json();
@@ -401,9 +401,6 @@ export async function createEditor(container: HTMLElement) {
         // console.log('调试信息 vca'+vcaNode.data().value);
         // 将收集到的数据发送到后端
         const connections: Conns[] = editor.getConnections(); // 确保 getConnections() 返回的类型匹配
-
-        const exists = isConnectionExist(connections, 'decayOutput', 'inputFromDecay');
-        console.log(`Connection from 'decayOutput' to 'inputFromDecay' exists: ${exists}`);
         if (!isConnectionExist(connections, 'attackOutput', 'inputFromAttack') || !isConnectionExist(connections, 'adsrOutput', 'inputFromAdsr')) {
             attackValue = NaN;
         }
